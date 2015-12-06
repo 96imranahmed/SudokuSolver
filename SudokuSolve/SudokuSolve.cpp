@@ -24,22 +24,27 @@ public:
 		y = _ycoord;
 		value = _value;
 	}
+	bool const operator== (const Change &i) const {
+		return (i.type == type && i.x == x && i.y == y && i.value == value);
+	}
+	//friend bool operator== (Change &i, Change &j);
 };
 //Sudoku Class
 class Sudoku {
 public:
-	bool slowmethod;
 	int size;
 	vector<vector<int>> workingset;
 	vector<vector<vector<int>>> possibleset;
 	vector<Change> updates;
+	const bool slowmethod = true;
+	const bool debug = false;
 	//Function Implementations
 	Sudoku(vector<vector<int>>& startmatrix)
 	{
-		slowmethod = false;
+
 		size = startmatrix.size();
 		if (size != (round(sqrt(size)) * round(sqrt(size)))) {
-			//cout << "Not a valid size - needs to be a perfect square!" << endl;
+			cout << "Not a valid size - needs to be a perfect square!" << endl;
 		}
 		else {
 			workingset = startmatrix;
@@ -58,7 +63,7 @@ public:
 			PrintSudoku();
 			auto end = get_time::now();
 			auto diff = end - start;
-			//cout << "Elapsed time is: " << chrono::duration_cast<ns>(diff).count()<< "ns" << endl;
+			if (debug) { cout << "Elapsed time is: " << chrono::duration_cast<ns>(diff).count() << "ns" << endl; };
 		}
 	}
 	void refreshOptions(vector<vector<int>> &set, vector<vector<vector<int>>> &optionset) {
@@ -113,11 +118,15 @@ public:
 			//If range is one value update the set automatically
 			if (range.size() == 1) {
 				set[y][x] = range[0];
-				//cout << "Single value of " << range[0] << " inserted at " << x << ";" << y << endl;
+				if (debug) {
+					cout << "Single value of " << range[0] << " inserted at " << x << ";" << y << endl;
+				}
 				updates.push_back(Change(0, x, y, range[0]));
 			}
 			if (range.size() == 0 && set[y][x] == 0) {
-				//cout << "No options at " << x << ";" << y << " - invalid set & will reverse changes" << endl;
+				if (debug) {
+					cout << "No options at " << x << ";" << y << " - invalid set & will reverse changes" << endl;
+				}
 				output = false;
 			}
 		}
@@ -133,10 +142,14 @@ public:
 		}
 		if (updates.size() > 0) {
 			//Reset updates from end to choice
-			//cout << "Reversing " << updates.size() - lastindex<< " updates" << endl;
+			if (debug) {
+				cout << "Reversing " << updates.size() - lastindex << " updates" << endl;
+			}
 			for (size_t i = lastindex + 1; i < updates.size(); i++) {
 				Change currentchange = updates[i];
-				//cout << "Reversing " << currentchange.value << " at " << currentchange.x << ";" << currentchange.y << endl;
+				if (debug) {
+					cout << "Reversing " << currentchange.value << " at " << currentchange.x << ";" << currentchange.y << endl;
+				}
 				set[currentchange.y][currentchange.x] = 0;
 				//Updates possibility set (these values are possible again)
 				optionset[currentchange.y][currentchange.x].push_back(currentchange.value);
@@ -153,35 +166,39 @@ public:
 				set[currentchange.y][currentchange.x] = choicerange[0];
 				optionset[currentchange.y][currentchange.x] = choicerange;
 				//Add new choice to update
-				//cout << "Now testing choice " << choicerange[0] << " on " << currentchange.x << ";" << currentchange.y << endl;
+				if (debug) {
+					cout << "Now testing choice " << choicerange[0] << " on " << currentchange.x << ";" << currentchange.y << endl;
+				}
 				updates.push_back(Change(1, currentchange.x, currentchange.y, choicerange[0]));
 			}
 			else {
 				//Move up in the tree again
 				updates.pop_back();
 				set[currentchange.y][currentchange.x] = 0;
-				//cout << "Reversing previous choice as no choices remain"<< endl;
+				if (debug) {
+					cout << "Reversing previous choice as no choices remain" << endl;
+				}
 				reverseChoice(set, optionset);
 			}
 		}
 	}
-	vector<Change> getLowestOptions(vector<vector<vector<int>>> &optionset) {
+	vector<Change> getLowestOptions(vector<vector<int>> &set, vector<vector<vector<int>>> &optionset) {
 		vector<Change> options;
 		for (size_t y = 0; y < optionset.size(); y++) {
 			vector<vector<int>> row = optionset[y];
 			for (size_t x = 0; x < row.size(); x++) {
-				//Enter a test choice!
-				if (row[x].size() > 0) {
+				if (row[x].size() > 0 && set[y][x] == 0) {
 					options.push_back(Change(2, x, y, row[x].size()));
 				}
 			}
 		}
-		sort(options.begin(), options.end(), [](const Change &i, Change &j) { return i.value < j.value; });
+		sort(options.begin(), options.end(), [](const Change &i, Change &j) {
+			return ((i.value < j.value) || (i.value == j.value && i.x < j.x) || (i.value == j.value && i.x == j.x && i.y < j.y)); });
 		return options;
 	}
 	void solveSudoku(vector<vector<int>> &set, vector<vector<vector<int>>> &optionset) {
 		refreshOptions(set, optionset);
-		vector<Change> process = getLowestOptions(optionset);
+		vector<Change> process = getLowestOptions(set, optionset);
 		do {
 			if (slowmethod) {
 				for (size_t y = 0; y < set.size(); y++) {
@@ -191,7 +208,9 @@ public:
 							//Enter a test choice!
 							if (optionset[y][x].size() > 0) {
 								set[y][x] = optionset[y][x][0];
-								//cout << "Testing choice " << optionset[y][x][0] << " on " << x << ";" << y << endl;
+								if (debug) {
+									cout << "Testing choice " << optionset[y][x][0] << " on " << x << ";" << y << endl;
+								}
 								updates.push_back(Change(1, x, y, set[y][x]));
 								if (!checkValid(set)) {
 									reverseChoice(set, optionset);
@@ -203,16 +222,20 @@ public:
 				}
 			}
 			else {
-				for (int i = 0; i < process.size(); i++) {
-					Change cur_choice = process[i];
+				if (process.size() > 0) {
+					Change cur_choice = process[0];
 					set[cur_choice.y][cur_choice.x] = optionset[cur_choice.y][cur_choice.x][0];
-					//cout << "Testing choice " << optionset[y][x][0] << " on " << x << ";" << y << endl;
+					if (debug) {
+						cout << "Testing choice " << optionset[cur_choice.y][cur_choice.x][0] << " on " << cur_choice.x << ";" << cur_choice.y << endl;
+					}
 					updates.push_back(Change(1, cur_choice.x, cur_choice.y, set[cur_choice.y][cur_choice.x]));
 					if (!checkValid(set)) {
 						reverseChoice(set, optionset);
+						refreshOptions(set, optionset);
+						process = getLowestOptions(set, optionset);
 					}
 					refreshOptions(set, optionset);
-					if (getLowestOptions(optionset).size() != process.size()) { i = 0; }
+					vector<Change> process_new = getLowestOptions(set, optionset);
 				}
 			}
 		} while (!checkSolved(set));
@@ -267,13 +290,17 @@ public:
 				}
 				for (int xx = 0; xx < size; xx++) {
 					if (row[xx] == value && xx != x) {
-						//cout << "Invalid - multiple " << value << " on row " << y << endl;
+						if (debug) {
+							cout << "Invalid - multiple " << value << " on row " << y << endl;
+						}
 						return false;
 					}
 				}
 				for (int yy = 0; yy < size; yy++) {
 					if ((set[yy])[x] == value && yy != y) {
-						//cout << "Invalid - multiple " << value << " on column " << x << endl;
+						if (debug) {
+							cout << "Invalid - multiple " << value << " on column " << x << endl;
+						}
 						return false;
 					}
 				}
@@ -282,7 +309,9 @@ public:
 				for (int yy = yrd; yy < (yrd + sqrt(size)); yy++) {
 					for (int xx = xrd; xx < (xrd + sqrt(size)); xx++) {
 						if ((set[yy])[xx] == value && xx != x && yy != y) {
-							//cout << "Invalid - multiple " << value << " in box" << endl;
+							if (debug) {
+								cout << "Invalid - multiple " << value << " in box" << endl;
+							}
 							return false;
 						}
 					}
@@ -330,10 +359,15 @@ int _tmain(int argc, _TCHAR* argv[])
 {
 	//vector<vector<int>> input = { { 0, 1, 0, 4 }, { 2, 0, 0, 0 }, { 0, 0, 0, 3 }, { 1, 0, 4, 0 } };
 	//vector<vector<int>> solution = { { 3, 1, 2, 4 }, { 2, 4, 3, 1 }, { 4, 2, 1, 3 }, { 1, 3, 4, 2 } };
-	vector<vector<int>> input =
-	{ { 0, 0, 0, 0, 0, 9, 0, 0, 0 }, { 0, 0, 0, 0, 0, 6, 2, 9, 0 }, { 0, 0, 3, 1, 5, 0, 0, 7, 0 },
-	{ 0, 0, 2, 0, 0, 0, 0, 1, 0 }, { 9, 0, 7, 0, 6, 0, 8, 0, 2 }, { 0, 1, 0, 0, 0, 0, 5, 0, 0 },
-	{ 0, 3, 0, 0, 1, 4, 9, 0, 0 }, { 0, 2, 6, 3, 0, 0, 0, 0, 0 }, { 0, 0, 0, 7, 0, 0, 0, 0, 0 } };
+	//vector<vector<int>> input =
+	//{ { 0, 0, 0, 0, 0, 9, 0, 0, 0 }, { 0, 0, 0, 0, 0, 6, 2, 9, 0 }, { 0, 0, 3, 1, 5, 0, 0, 7, 0 },
+	//{ 0, 0, 2, 0, 0, 0, 0, 1, 0 }, { 9, 0, 7, 0, 6, 0, 8, 0, 2 }, { 0, 1, 0, 0, 0, 0, 5, 0, 0 },
+	//{ 0, 3, 0, 0, 1, 4, 9, 0, 0 }, { 0, 2, 6, 3, 0, 0, 0, 0, 0 }, { 0, 0, 0, 7, 0, 0, 0, 0, 0 } };
+	
+	 vector<vector<int>> input =
+	{ { 8, 0, 0, 0, 0, 0, 0, 0, 0 }, { 0, 0, 3, 6, 0, 0, 0, 0, 0}, { 0, 7, 0, 0, 9, 0, 2, 0, 0 },
+	{ 0, 5, 0, 0, 0, 7, 0, 0, 0 }, { 0, 0, 0, 0, 4, 5, 7, 0, 0 }, { 0, 0, 0, 1, 0, 0, 0, 3, 0 },
+	{ 0, 0, 1, 0, 0, 0, 0, 6, 8 }, { 0, 0, 8, 5, 0, 0, 0, 1, 0 }, { 0, 9, 0, 0, 0, 0, 4, 0, 0 } };
 	
 	Sudoku currentproblem = Sudoku(input);
 	system("pause");
