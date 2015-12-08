@@ -36,7 +36,7 @@ public:
 	vector<vector<int>> workingset;
 	vector<vector<vector<int>>> possibleset;
 	vector<Change> updates;
-	const bool slowmethod = true;
+	const bool slowmethod = false;
 	const bool debug = false;
 	//Function Implementations
 	Sudoku(vector<vector<int>>& startmatrix)
@@ -231,11 +231,9 @@ public:
 					updates.push_back(Change(1, cur_choice.x, cur_choice.y, set[cur_choice.y][cur_choice.x]));
 					if (!checkValid(set)) {
 						reverseChoice(set, optionset);
-						refreshOptions(set, optionset);
-						process = getLowestOptions(set, optionset);
 					}
 					refreshOptions(set, optionset);
-					vector<Change> process_new = getLowestOptions(set, optionset);
+					process = getLowestOptions(set, optionset);
 				}
 			}
 		} while (!checkSolved(set));
